@@ -1,4 +1,4 @@
-import { screenHeight, screenWidth } from "@/utils/Constants";
+import { screenHeight, screenWidth } from "../utils/Constants";
 import { StyleSheet } from "react-native";
 
 export const splashStyles = StyleSheet.create({

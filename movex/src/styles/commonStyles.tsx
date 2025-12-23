@@ -1,5 +1,5 @@
 
-import { Colors } from "@/utils/Constants";
+import { Colors } from "../utils/Constants";
 import { StyleSheet } from "react-native";
 
 export const commonStyles = StyleSheet.create({
