@@ -1,10 +1,52 @@
-import { View, Text } from 'react-native'
+import { View, Text, Image, TouchableOpacity } from 'react-native'
 import React from 'react'
+import { router } from 'expo-router'
+import { roleStyles } from '../styles/roleStyles'
+import CustomText from '../components/shared/CustomText'
 
 const Role = () => {
+
+  const handleCustomerPress = () => {
+    router.push('/customer/auth');
+  }
+  const handleDriverPress = () => {
+    router.push('/rider/auth');
+  }
+
   return (
-    <View>
-      <Text>role</Text>
+    <View style={roleStyles.container}>
+      <Image source={require("@/src/assets/images/riderlogo.jpg")}
+      style={roleStyles.logo} />
+      <CustomText fontFamily='Regular' variant='h6' >Choose your user type</CustomText>
+
+      <TouchableOpacity style={roleStyles.card} onPress={handleCustomerPress}>
+        <Image source={require("@/src/assets/images/customer.jpg")} 
+        style={roleStyles.image} 
+        />
+        <View style={roleStyles.cardContent}>
+          <CustomText style={roleStyles.title}>Customer</CustomText>
+          <CustomText style={roleStyles.description}>
+            Are you a customer ? Order rides and deliveries easily.
+          </CustomText>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={roleStyles.card} onPress={handleDriverPress}>
+        <Image 
+        source={require("@/src/assets/images/rider.jpg")}
+        style={roleStyles.image}
+        />
+        <View style={roleStyles.cardContent}>
+          <CustomText style={roleStyles.title}>Rider</CustomText>
+          <CustomText style={roleStyles.description}>
+            Are you a rider ? Join us to drive and deliver.
+          </CustomText>
+        </View>
+      </TouchableOpacity>
+
+
+
+
     </View>
   )
 }

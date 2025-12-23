@@ -1,4 +1,4 @@
-import { Colors, screenWidth } from "@/utils/Constants";
+import { Colors, screenWidth } from "../utils/Constants";
 import { Platform, StyleSheet } from "react-native";
 
 export const authStyles = StyleSheet.create({
