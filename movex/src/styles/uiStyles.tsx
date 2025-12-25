@@ -1,4 +1,4 @@
-import { Colors, screenWidth } from "@/utils/Constants";
+import { Colors, screenWidth } from "../utils/Constants";
 import { StyleSheet } from "react-native";
 import { RFValue } from "react-native-responsive-fontsize";
 
@@ -26,7 +26,7 @@ export const uiStyles = StyleSheet.create({
         shadowColor: '#000',
         elevation: 10,
         alignItems: 'center',
-        padding: 6
+        padding: 10
     },
     dot: {
         width: 6,

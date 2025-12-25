@@ -15,14 +15,6 @@ import CustomText from './CustomText'
   onChangeText: (text: string) => void;
   onFocus?: () => void;
   onBlur?: () => void;
-  placeholder?: string;
-  countryCode?: string;
-  maxLength?: number;
-  editable?: boolean;
-  error?: boolean;
-  containerStyle?: ViewStyle;
-  inputStyle?: TextStyle;
-  codeStyle?: TextStyle;
 }
 
 const PhoneInput: FC<PhoneInputProps> = ({
@@ -30,27 +22,26 @@ const PhoneInput: FC<PhoneInputProps> = ({
   onChangeText,
   onBlur,
   onFocus,
-  placeholder = '+234 8000 400',
-  countryCode = '+234',
-  maxLength = 11,
-  editable = true,
-  error = false,
-  containerStyle,
-  inputStyle,
-  codeStyle,
+
 }) => {
-  // Handle text change - ensure only numbers are entered
-  const handleTextChange = (text: string) => {
-    // Remove any non-numeric characters
-    const numericText = text.replace(/[^0-9]/g, '');
-    onChangeText(numericText);
-  };
+  
 
   return (
    <View style={styles.container}>
     <CustomText fontFamily='Regular' style={styles.text}>
         +234
     </CustomText>
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      onBlur={onBlur}
+      onFocus={onFocus}
+      placeholder="000 000 0000"
+      keyboardType='phone-pad'
+      maxLength={11}
+      placeholderTextColor={"#ccc"}
+      style={styles.input}
+    />
    </View>
   )
 }
@@ -58,39 +49,25 @@ const PhoneInput: FC<PhoneInputProps> = ({
 export default PhoneInput
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
+ container: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
-    borderColor: "#E0E0E0",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    height: 56,
-    marginVertical: 8,
-  },
-  errorContainer: {
-    borderColor: "#FF3B30",
-    backgroundColor: "#FFF5F5",
-  },
-  input: {
-    fontSize: RFValue(16),
-    fontFamily: "Regular",
-    flex: 1,
-    height: '100%',
-    color: "#333333",
-    paddingVertical: 0,
-  },
-  codeText: {
-    fontSize: RFValue(16),
-    fontFamily: "Regular",
-    color: "#333333",
-    minWidth: 40,
-  },
-  separator: {
-    width: 1,
-    height: 24,
-    backgroundColor: "#E0E0E0",
-    marginHorizontal: 8,
-  },
+    borderColor: '#222',
+    borderRadius: 0,
+    paddingHorizontal: 10,
+    marginVertical: 15,
+    gap: 4,
+ },
+ input: {
+    fontSize: RFValue(14),
+    fontFamily: 'Regular',
+    height: 45,
+    width: '90%',
+ },
+    text: {
+    fontSize: RFValue(14),
+    top: -1,
+    fontFamily: 'Regular',
+  } 
 })

@@ -1,223 +1,116 @@
-import { createContext, useEffect, useRef, useState, useContext } from "react";
-import { io, Socket } from "socket.io-client";
-import { tokenStorage } from "../store/storage";
-import { refresh_token } from "./apiInterceptors";
-import { SOCKET_URL } from "./config";
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
+import { SOCKET_URL } from './config';
+import { tokenStorage } from '../store/storage';
+import { refresh_token } from './apiInterceptors';
 
-interface WSService {
-    initializeSocket: () => void;
-    emit: (event: string, data?: any) => void;
-    on: (event: string, cb: (data: any) => void) => void;
-    off: (event: string) => void; // Fixed typo: offf -> off
-    removeListener: (listenerName: string) => void;
-    updateAccessToken: () => void;
-    disconnect: () => void;
-    isConnected: () => boolean;
+interface WSContextType {
+  socket: Socket | null;
+  isConnected: boolean;
+  updateAccessToken: () => void;
 }
 
-const WSContext = createContext<WSService | undefined>(undefined);
+const WSContext = createContext<WSContextType | undefined>(undefined);
 
-export const useWebSocket = (): WSService => {
-    const context = useContext(WSContext);
-    if (!context) {
-        throw new Error("useWebSocket must be used within WSProvider");
+export const WSProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const socket = useRef<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 3;
+
+  const connectSocket = () => {
+    const accessToken = tokenStorage.getString('access_token');
+    
+    // Don't try to connect if there's no token
+    if (!accessToken) {
+      console.log('No access token available, skipping WebSocket connection');
+      return;
     }
-    return context;
-};
 
-export const WSProvider: React.FC<{ children: React.ReactNode }> = ({
-    children,
-}) => {
-    const [socketAccessToken, setSocketAccessToken] = useState<string | null>(
-        null
-    );
-    const socket = useRef<Socket | null>(null);
-    const listeners = useRef<Map<string, ((data: any) => void)[]>>(new Map());
+    // Disconnect existing socket if any
+    if (socket.current?.connected) {
+      socket.current.disconnect();
+    }
 
-    // Initialize access token
-    useEffect(() => {
-        const token = tokenStorage.getString("access_token");
-        setSocketAccessToken(token || null);
-    }, []);
+    socket.current = io(SOCKET_URL, {
+      auth: { token: accessToken },
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: maxReconnectAttempts,
+      reconnectionDelay: 1000,
+    });
 
-    // Initialize socket connection
-    const initializeSocket = () => {
-        if (!socketAccessToken) {
-            console.warn("No access token available for WebSocket connection");
-            return;
-        }
+    socket.current.on('connect', () => {
+      console.log('✅ WebSocket connected');
+      setIsConnected(true);
+      reconnectAttempts.current = 0;
+    });
 
-        if (socket.current?.connected) {
-            console.log("Socket already connected");
-            return;
-        }
+    socket.current.on('disconnect', (reason) => {
+      console.log('❌ WebSocket disconnected:', reason);
+      setIsConnected(false);
+    });
 
-        // Disconnect existing socket if any
-        if (socket.current) {
-            socket.current.disconnect();
-        }
-
-        socket.current = io(SOCKET_URL, {
-            transports: ["websocket"],
-            withCredentials: true,
-            auth: {
-                token: socketAccessToken,
-            },
-            extraHeaders: {
-                Authorization: `Bearer ${socketAccessToken}`,
-            },
-            autoConnect: true,
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-        });
-
-        // Connection event handlers
-        socket.current.on("connect", () => {
-            console.log("WebSocket connected successfully");
-        });
-
-        socket.current.on("connect_error", async (error) => {
-            console.error("Socket connection error:", error.message);
+    socket.current.on('connect_error', async (error: any) => {
+      console.log('Socket connection error:', error.message);
+      
+      // Only try to refresh token if we have one and error is auth-related
+      if (error.message?.includes('Authentication') || error.message?.includes('token')) {
+        if (reconnectAttempts.current < maxReconnectAttempts) {
+          reconnectAttempts.current++;
+          console.log(`Attempting to refresh token (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
+          
+          try {
+            await refresh_token();
+            const newToken = tokenStorage.getString('access_token');
             
-            if (error.message.includes("Authentication") || 
-                error.message.includes("auth") ||
-                error.message === "Authentication error") {
-                console.log("Authentication error detected, refreshing token...");
-                
-                try {
-                    const newToken = await refresh_token();
-                    if (newToken) {
-                        updateAccessToken();
-                    }
-                } catch (refreshError) {
-                    console.error("Token refresh failed:", refreshError);
-                }
+            if (newToken && socket.current) {
+              socket.current.auth = { token: newToken };
+              socket.current.connect();
             }
-        });
-
-        socket.current.on("disconnect", (reason) => {
-            console.log("Socket disconnected:", reason);
-            if (reason === "io server disconnect") {
-                // The server has forcefully disconnected the socket
-                // You can attempt to reconnect after a delay
-                setTimeout(() => {
-                    if (socket.current && !socket.current.connected) {
-                        socket.current.connect();
-                    }
-                }, 1000);
-            }
-        });
-
-        // Re-register existing listeners
-        listeners.current.forEach((callbacks, event) => {
-            callbacks.forEach(callback => {
-                socket.current?.on(event, callback);
-            });
-        });
-    };
-
-    // Effect to manage socket lifecycle
-    useEffect(() => {
-        if (socketAccessToken) {
-            initializeSocket();
-        }
-
-        return () => {
-            if (socket.current) {
-                // Remove all listeners before disconnecting
-                listeners.current.forEach((_, event) => {
-                    socket.current?.removeAllListeners(event);
-                });
-                listeners.current.clear();
-                socket.current.disconnect();
-                socket.current = null;
-            }
-        };
-    }, [socketAccessToken]);
-
-    const emit = (event: string, data?: any) => {
-        if (!socket.current?.connected) {
-            console.warn("Cannot emit: Socket not connected");
-            return;
-        }
-        socket.current.emit(event, data);
-    };
-
-    const on = (event: string, cb: (data: any) => void) => {
-        if (!listeners.current.has(event)) {
-            listeners.current.set(event, []);
-        }
-        listeners.current.get(event)?.push(cb);
-        socket.current?.on(event, cb);
-    };
-
-    const off = (event: string, cb?: (data: any) => void) => {
-        if (cb) {
-            // Remove specific callback
-            const callbacks = listeners.current.get(event);
-            if (callbacks) {
-                const index = callbacks.indexOf(cb);
-                if (index > -1) {
-                    callbacks.splice(index, 1);
-                }
-                socket.current?.off(event, cb);
-            }
+          } catch (refreshError) {
+            console.log('Token refresh failed, will retry on next attempt');
+          }
         } else {
-            // Remove all callbacks for this event
-            listeners.current.delete(event);
-            socket.current?.removeAllListeners(event);
+          console.log('Max reconnection attempts reached, giving up');
         }
-    };
+      }
+    });
+  };
 
-    const removeListener = (listenerName: string) => {
-        off(listenerName);
-    };
+  const updateAccessToken = () => {
+    console.log('🔄 Access token updated, reconnecting WebSocket...');
+    connectSocket();
+  };
 
-    const disconnect = () => {
-        if (socket.current) {
-            listeners.current.clear();
-            socket.current.removeAllListeners();
-            socket.current.disconnect();
-            socket.current = null;
-        }
-    };
+  useEffect(() => {
+    // Only connect if we have a token
+    const accessToken = tokenStorage.getString('access_token');
+    if (accessToken) {
+      connectSocket();
+    } else {
+      console.log('No token found, WebSocket will connect after sign in');
+    }
 
-    const isConnected = () => {
-        return socket.current?.connected || false;
+    return () => {
+      if (socket.current) {
+        console.log('Cleaning up WebSocket connection');
+        socket.current.disconnect();
+      }
     };
+  }, []);
 
-    const updateAccessToken = () => {
-        const token = tokenStorage.getString("access_token");
-        if (token !== socketAccessToken) {
-            setSocketAccessToken(token || null);
-        }
-    };
-
-    const socketService: WSService = {
-        initializeSocket,
-        emit,
-        off,
-        on,
-        disconnect,
-        removeListener,
-        updateAccessToken,
-        isConnected,
-    };
-
-    return (
-        <WSContext.Provider value={socketService}>
-            {children}
-        </WSContext.Provider>
-    );
+  return (
+    <WSContext.Provider value={{ socket: socket.current, isConnected, updateAccessToken }}>
+      {children}
+    </WSContext.Provider>
+  );
 };
 
-
-
-export const useWS = (): WSService => {
-    const socketService = useContext(WSContext);
-    if(!socketService){
-        throw new Error("useWS must be used with a WSProvider")
-    }
-    return socketService
-}
+export const useWS = () => {
+  const context = useContext(WSContext);
+  if (!context) {
+    throw new Error('useWS must be used within WSProvider');
+  }
+  return context;
+};

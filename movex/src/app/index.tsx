@@ -30,45 +30,44 @@ const Page = () => {
   const navigationState = useRootNavigationState(); // Check if router is ready
 
   const tokenCheck = async () => {
-    // Don't navigate if router isn't ready
-    if (!navigationState?.key) return;
-    
-    const access_token = tokenStorage.getString("access_token") as string;
-    const refresh_tokens = tokenStorage.getString("refresh_token") as string;
+  if (!navigationState?.key) return;
+  
+  const access_token = await tokenStorage.getStringAsync("access_token");
+  const refresh_tokens = await tokenStorage.getStringAsync("refresh_token");
 
-    if(access_token){
-      const decodedAccessToken = jwtDecode<DecodedToken>(access_token);
-      const decodedRefreshToken = jwtDecode<DecodedToken>(refresh_tokens);
-      const currentTime = Date.now() / 1000;
+  if(access_token){
+    const decodedAccessToken = jwtDecode<DecodedToken>(access_token);
+    const decodedRefreshToken = jwtDecode<DecodedToken>(refresh_tokens!);
+    const currentTime = Date.now() / 1000;
 
-      if(decodedRefreshToken?.exp < currentTime) {
-        resetAndNavigate('/role');
-        logout();
-        Alert.alert("Session Expired, please login again");
-        return;
-      }
-
-      if(decodedAccessToken?.exp < currentTime){
-        try {
-          await refresh_token();
-        } catch (error) {
-          console.log(error);
-          Alert.alert("Refresh Token Error");
-          resetAndNavigate('/role');
-          return;
-        }
-      }
-
-      if(user) {
-        resetAndNavigate("/customer/home");
-      } else {
-        resetAndNavigate("/rider/home");
-      }
+    if(decodedRefreshToken?.exp < currentTime) {
+      resetAndNavigate('/role');
+      logout();
+      Alert.alert("Session Expired, please login again");
       return;
     }
 
-    resetAndNavigate('/role');
+    if(decodedAccessToken?.exp < currentTime){
+      try {
+        await refresh_token();
+      } catch (error) {
+        console.log(error);
+        Alert.alert("Refresh Token Error");
+        resetAndNavigate('/role');
+        return;
+      }
+    }
+
+    if(user) {
+      resetAndNavigate("/customer/home");
+    } else {
+      resetAndNavigate("/rider/home");
+    }
+    return;
   }
+
+  resetAndNavigate('/role');
+}
 
   useEffect(() => {
     if(loaded && !hasNavigated && navigationState?.key){
